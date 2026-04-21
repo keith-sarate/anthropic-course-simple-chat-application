@@ -367,6 +367,120 @@ function TemperatureChat() {
   );
 }
 
+// --- Streaming Chat ---
+function StreamingChat() {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [streamingText, setStreamingText] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function sendMessage(e) {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const updatedMessages = [...messages, { role: "user", content: input }];
+    setMessages(updatedMessages);
+    setInput("");
+    setLoading(true);
+    setStreamingText("");
+
+    const res = await fetch("/api/streaming-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: updatedMessages }),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+
+    let finished = false;
+    while (!finished) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") { finished = true; break; }
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.text) {
+              fullText += parsed.text;
+              setStreamingText(fullText);
+            }
+          } catch {}
+        }
+      }
+    }
+
+    setMessages([...updatedMessages, { role: "assistant", content: fullText }]);
+    setStreamingText("");
+    setLoading(false);
+  }
+
+  return (
+    <div style={styles.panel}>
+      <h2 style={styles.panelTitle}>Streaming Chat</h2>
+      <p style={styles.panelSubtitle}>Text streams in real-time — appears as Claude generates it</p>
+
+      <div style={styles.streamingBadge}>SSE · text/event-stream</div>
+
+      <div style={styles.messageList}>
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            style={msg.role === "user" ? styles.userBubble : styles.assistantBubble}
+          >
+            <strong>{msg.role === "user" ? "You" : "Claude"}:</strong>
+            <p style={styles.responseText}>{msg.content}</p>
+          </div>
+        ))}
+        {loading && !streamingText && (
+          <div style={styles.assistantBubble}>
+            <em>Claude is thinking...</em>
+          </div>
+        )}
+        {loading && streamingText && (
+          <div style={styles.assistantBubble}>
+            <strong>Claude:</strong>
+            <p style={styles.responseText}>
+              {streamingText}
+              <span style={styles.cursor}>▌</span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={sendMessage} style={styles.form}>
+        <textarea
+          style={styles.textarea}
+          rows={3}
+          placeholder="Type your message..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <div style={styles.formRow}>
+          <button style={styles.button} type="submit" disabled={loading}>
+            {loading ? "Streaming..." : "Send"}
+          </button>
+          <button
+            type="button"
+            style={styles.clearButton}
+            onClick={() => setMessages([])}
+            disabled={loading || messages.length === 0}
+          >
+            Clear history
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // --- Page ---
 export default function Home() {
   return (
@@ -378,6 +492,7 @@ export default function Home() {
         <MultiTurnConversation />
         <SystemPromptChat />
         <TemperatureChat />
+        <StreamingChat />
       </div>
     </div>
   );
@@ -400,7 +515,7 @@ const styles = {
   },
   columns: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr 1fr",
+    gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
     gap: 16,
     alignItems: "start",
   },
@@ -554,5 +669,21 @@ const styles = {
     padding: "1px 7px",
     fontWeight: 600,
     fontSize: 11,
+  },
+  cursor: {
+    display: "inline-block",
+    color: "#c96442",
+    animation: "blink 1s step-end infinite",
+  },
+  streamingBadge: {
+    display: "inline-block",
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#7c3aed",
+    backgroundColor: "#ede9fe",
+    border: "1px solid #ddd6fe",
+    borderRadius: 4,
+    padding: "2px 8px",
+    marginBottom: 16,
   },
 };
