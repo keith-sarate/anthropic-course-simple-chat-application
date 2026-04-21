@@ -2,9 +2,11 @@
 
 This project is part of the **Anthropic API course**. The goal is to understand the basics of making a request to Claude using the Anthropic SDK — specifically the `messages.create` call with `model`, `max_tokens`, and `messages` parameters — and displaying the response.
 
-model - The name of the Claude model you want to use
-max_tokens - A safety limit on response length (not a target)
-messages - The conversation history you're sending to Claude
+`model` - The name of the Claude model you want to use
+
+`max_tokens` - A safety limit on response length (not a target)
+
+`messages` - The conversation history you're sending to Claude
 
 ## Structure
 
