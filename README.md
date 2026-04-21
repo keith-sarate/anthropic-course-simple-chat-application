@@ -10,6 +10,8 @@ This project is part of the **Anthropic API course**. The goal is to understand 
 
 `system` - System prompts provide Claude guidance on how to respond, Shape Claude'stone, style, and approach to match your specific use case;
 
+`temperature` - Controls how predictable or creative Claude's responses will be, from 0.0 to 1.0;
+
 ## Structure
 
 ```

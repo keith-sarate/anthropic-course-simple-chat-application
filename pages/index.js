@@ -235,6 +235,138 @@ function SystemPromptChat() {
   );
 }
 
+// --- Temperature Chat ---
+function TemperatureChat() {
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [temperature, setTemperature] = useState(1.0);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  function addUserMessage(msgs, text) {
+    return [...msgs, { role: "user", content: text }];
+  }
+
+  function addAssistantMessage(msgs, text) {
+    return [...msgs, { role: "assistant", content: text }];
+  }
+
+  async function sendMessage(e) {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const updatedMessages = addUserMessage(messages, input);
+    setMessages(updatedMessages);
+    setInput("");
+    setLoading(true);
+
+    const res = await fetch("/api/temperature-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: updatedMessages, system: systemPrompt, temperature }),
+    });
+
+    const data = await res.json();
+    const reply = data.response || data.error;
+
+    setMessages(addAssistantMessage(updatedMessages, reply));
+    setLoading(false);
+  }
+
+  return (
+    <div style={styles.panel}>
+      <h2 style={styles.panelTitle}>Temperature Chat</h2>
+      <p style={styles.panelSubtitle}>Control randomness — lower values are focused, higher values are creative</p>
+
+      <div style={styles.tempGuide}>
+        <div style={styles.tempGuideBlock}>
+          <span style={{ ...styles.tempGuideBadge, backgroundColor: "#dbeafe", color: "#1d4ed8" }}>Low (0.0 – 0.3)</span>
+          <span>Factual responses · Coding · Data extraction · Content moderation</span>
+        </div>
+        <div style={styles.tempGuideBlock}>
+          <span style={{ ...styles.tempGuideBadge, backgroundColor: "#fef9c3", color: "#854d0e" }}>Medium (0.4 – 0.7)</span>
+          <span>Summarization · Education · Problem-solving · Constrained creative writing</span>
+        </div>
+        <div style={styles.tempGuideBlock}>
+          <span style={{ ...styles.tempGuideBadge, backgroundColor: "#fee2e2", color: "#b91c1c" }}>High (0.8 – 1.0)</span>
+          <span>Brainstorming · Creative writing · Marketing · Jokes</span>
+        </div>
+      </div>
+
+      <label style={styles.systemLabel}>System prompt (optional)</label>
+      <div style={styles.systemExample}>
+        <strong>Example:</strong> "You are a patient math tutor. Do not directly answer a student's questions. Guide them to a solution step by step."
+      </div>
+      <textarea
+        style={{ ...styles.textarea, ...styles.systemTextarea }}
+        rows={3}
+        placeholder="Enter your system prompt here..."
+        value={systemPrompt}
+        onChange={(e) => setSystemPrompt(e.target.value)}
+      />
+
+      <div style={styles.temperatureRow}>
+        <label style={styles.systemLabel}>Temperature: <span style={styles.tempValue}>{temperature.toFixed(1)}</span></label>
+        <div style={styles.tempLabels}>
+          <span>Precise (0.0)</span>
+          <span>Creative (1.0)</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={temperature}
+          onChange={(e) => setTemperature(parseFloat(e.target.value))}
+          style={styles.slider}
+        />
+      </div>
+
+      <div style={styles.divider} />
+
+      <div style={styles.messageList}>
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            style={msg.role === "user" ? styles.userBubble : styles.assistantBubble}
+          >
+            <strong>{msg.role === "user" ? "You" : "Claude"}:</strong>
+            <p style={styles.responseText}>{msg.content}</p>
+          </div>
+        ))}
+        {loading && (
+          <div style={styles.assistantBubble}>
+            <em>Claude is thinking...</em>
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={sendMessage} style={styles.form}>
+        <textarea
+          style={styles.textarea}
+          rows={3}
+          placeholder="Type your message..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <div style={styles.formRow}>
+          <button style={styles.button} type="submit" disabled={loading}>
+            {loading ? "Sending..." : "Send"}
+          </button>
+          <button
+            type="button"
+            style={styles.clearButton}
+            onClick={() => setMessages([])}
+            disabled={loading || messages.length === 0}
+          >
+            Clear history
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // --- Page ---
 export default function Home() {
   return (
@@ -245,6 +377,7 @@ export default function Home() {
         <SimpleChat />
         <MultiTurnConversation />
         <SystemPromptChat />
+        <TemperatureChat />
       </div>
     </div>
   );
@@ -253,8 +386,8 @@ export default function Home() {
 const styles = {
   page: {
     fontFamily: "sans-serif",
-    padding: "40px 24px",
-    maxWidth: 1280,
+    padding: "32px 12px",
+    maxWidth: "100%",
     margin: "0 auto",
   },
   title: {
@@ -267,14 +400,14 @@ const styles = {
   },
   columns: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr",
-    gap: 32,
+    gridTemplateColumns: "1fr 1fr 1fr 1fr",
+    gap: 16,
     alignItems: "start",
   },
   panel: {
     border: "1px solid #ddd",
     borderRadius: 10,
-    padding: 24,
+    padding: 16,
     backgroundColor: "#fff",
   },
   panelTitle: {
@@ -380,5 +513,46 @@ const styles = {
   divider: {
     borderTop: "1px dashed #ddd",
     margin: "20px 0",
+  },
+  temperatureRow: {
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  tempValue: {
+    color: "#c96442",
+    fontWeight: 700,
+  },
+  tempLabels: {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: 11,
+    color: "#999",
+    marginBottom: 4,
+  },
+  slider: {
+    width: "100%",
+    accentColor: "#c96442",
+    cursor: "pointer",
+  },
+  tempGuide: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    marginBottom: 16,
+    fontSize: 12,
+    color: "#555",
+  },
+  tempGuideBlock: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: 8,
+    lineHeight: 1.5,
+  },
+  tempGuideBadge: {
+    flexShrink: 0,
+    borderRadius: 4,
+    padding: "1px 7px",
+    fontWeight: 600,
+    fontSize: 11,
   },
 };
