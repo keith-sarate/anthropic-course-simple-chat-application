@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-export default function Home() {
+// --- Simple Chat (no history) ---
+function SimpleChat() {
   const [message, setMessage] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,9 +25,9 @@ export default function Home() {
   }
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>Anthropic API — First Request</h1>
-      <p style={styles.subtitle}>Simple chat using claude-opus-4-5</p>
+    <div style={styles.panel}>
+      <h2 style={styles.panelTitle}>Simple Chat</h2>
+      <p style={styles.panelSubtitle}>Each message is independent — no memory between turns</p>
 
       <form onSubmit={sendMessage} style={styles.form}>
         <textarea
@@ -51,30 +52,155 @@ export default function Home() {
   );
 }
 
+// --- Multi Turn Conversation ---
+function MultiTurnConversation() {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  function addUserMessage(msgs, text) {
+    return [...msgs, { role: "user", content: text }];
+  }
+
+  function addAssistantMessage(msgs, text) {
+    return [...msgs, { role: "assistant", content: text }];
+  }
+
+  async function sendMessage(e) {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const updatedMessages = addUserMessage(messages, input);
+    setMessages(updatedMessages);
+    setInput("");
+    setLoading(true);
+
+    const res = await fetch("/api/multi-turn-conversation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: updatedMessages }),
+    });
+
+    const data = await res.json();
+    const reply = data.response || data.error;
+
+    setMessages(addAssistantMessage(updatedMessages, reply));
+    setLoading(false);
+  }
+
+  return (
+    <div style={styles.panel}>
+      <h2 style={styles.panelTitle}>Multi Turn Conversation</h2>
+      <p style={styles.panelSubtitle}>Conversation context is maintained across all turns</p>
+
+      <div style={styles.messageList}>
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            style={msg.role === "user" ? styles.userBubble : styles.assistantBubble}
+          >
+            <strong>{msg.role === "user" ? "You" : "Claude"}:</strong>
+            <p style={styles.responseText}>{msg.content}</p>
+          </div>
+        ))}
+        {loading && (
+          <div style={styles.assistantBubble}>
+            <em>Claude is thinking...</em>
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={sendMessage} style={styles.form}>
+        <textarea
+          style={styles.textarea}
+          rows={4}
+          placeholder="Type your message..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <div style={styles.formRow}>
+          <button style={styles.button} type="submit" disabled={loading}>
+            {loading ? "Sending..." : "Send"}
+          </button>
+          <button
+            type="button"
+            style={styles.clearButton}
+            onClick={() => setMessages([])}
+            disabled={loading || messages.length === 0}
+          >
+            Clear history
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// --- Page ---
+export default function Home() {
+  return (
+    <div style={styles.page}>
+      <h1 style={styles.title}>Anthropic API — Chat</h1>
+      <p style={styles.subtitle}>claude-opus-4-5</p>
+      <div style={styles.columns}>
+        <SimpleChat />
+        <MultiTurnConversation />
+      </div>
+    </div>
+  );
+}
+
 const styles = {
-  container: {
-    maxWidth: 640,
-    margin: "60px auto",
+  page: {
     fontFamily: "sans-serif",
-    padding: "0 16px",
+    padding: "40px 24px",
+    maxWidth: 1280,
+    margin: "0 auto",
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     marginBottom: 4,
   },
   subtitle: {
     color: "#666",
-    marginBottom: 24,
+    marginBottom: 32,
+  },
+  columns: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 32,
+    alignItems: "start",
+  },
+  panel: {
+    border: "1px solid #ddd",
+    borderRadius: 10,
+    padding: 24,
+    backgroundColor: "#fff",
+  },
+  panelTitle: {
+    fontSize: 18,
+    marginBottom: 4,
+    marginTop: 0,
+  },
+  panelSubtitle: {
+    color: "#888",
+    fontSize: 13,
+    marginBottom: 20,
+    marginTop: 0,
   },
   form: {
     display: "flex",
     flexDirection: "column",
     gap: 12,
   },
+  formRow: {
+    display: "flex",
+    gap: 8,
+  },
   textarea: {
     width: "100%",
     padding: 12,
-    fontSize: 16,
+    fontSize: 15,
     borderRadius: 6,
     border: "1px solid #ccc",
     resize: "vertical",
@@ -82,23 +208,51 @@ const styles = {
   },
   button: {
     padding: "10px 24px",
-    fontSize: 16,
+    fontSize: 15,
     backgroundColor: "#c96442",
     color: "#fff",
     border: "none",
     borderRadius: 6,
     cursor: "pointer",
-    alignSelf: "flex-start",
+  },
+  clearButton: {
+    padding: "10px 16px",
+    fontSize: 15,
+    backgroundColor: "transparent",
+    color: "#888",
+    border: "1px solid #ccc",
+    borderRadius: 6,
+    cursor: "pointer",
   },
   responseBox: {
-    marginTop: 32,
-    padding: 16,
+    marginTop: 24,
+    padding: 14,
+    backgroundColor: "#f9f6f2",
+    borderRadius: 6,
+    border: "1px solid #e0d8cf",
+  },
+  messageList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    marginBottom: 20,
+    maxHeight: 420,
+    overflowY: "auto",
+  },
+  userBubble: {
+    padding: 12,
+    backgroundColor: "#eef2ff",
+    borderRadius: 6,
+    border: "1px solid #d0d9f5",
+  },
+  assistantBubble: {
+    padding: 12,
     backgroundColor: "#f9f6f2",
     borderRadius: 6,
     border: "1px solid #e0d8cf",
   },
   responseText: {
-    marginTop: 8,
+    marginTop: 4,
     lineHeight: 1.6,
     whiteSpace: "pre-wrap",
   },
